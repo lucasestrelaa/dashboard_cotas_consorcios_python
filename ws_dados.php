@@ -12,9 +12,9 @@ $_GET['referenciaFinal'] = isset($_GET['referenciaFinal']) ? $_GET['referenciaFi
 
 //parâmetros de conexão com o banco de dados
 $host = 'localhost';
-$username = 'u856143160_dados';
-$password = 'dadosWiz123';
-$db_name = 'u856143160_dados';
+$username = 'XXXXXXXXXX';
+$password = 'XXXXXXXXXX';
+$db_name = 'XXXXXXXXXX';
 
 //conexão com o banco de dados
 try {
