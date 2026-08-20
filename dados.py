@@ -46,22 +46,22 @@ ticketMedioFormatado = formataReal(ticket_medio)
 
 cores = ['#1A4B83', '#3478C6', '#8CB3E3', '#0A2540', '#A0AAB5', '#E0E6ED', '#6C757D']
 
-#Exibição de dados
+#exibição de dados
 
-#Cálculo de expectativa de conversões (KPIs)
+#cálculo de expectativa de conversões (KPIs)
 if not df.empty and 'nivel_fidelidade' in df.columns:
-    # Contagem por grupo
+    #contagem por grupo
     qntNovosOcasionais = df[df['nivel_fidelidade'].isin(['Novo', 'Ocasional'])].shape[0]
     dfVip = df[df['nivel_fidelidade'].isin(['VIP', 'Frequente'])]
     
-    # Ticket médio dos VIPs/Frequentes
+    #ticket médio dos VIPs/Frequentes
     ticketMedioVip = dfVip['valor_total'].mean() if not dfVip.empty else (ticketMedio * 1.5)
     
-    # Projeção de Metas de Conversão (Cenário de Meta: 15% de upgrade)
+    #projeção de Metas de Conversão (15% de upgrade)
     taxaConversaoAlvo = 0.15 
     metaConversaoQtd = int(qntNovosOcasionais * taxaConversaoAlvo)
     
-    # Incremento financeiro estimado
+    #incremento financeiro estimado
     incrementoFaturamento = metaConversaoQtd * ticketMedioVip
 else:
     metaConversaoQtd = 0
@@ -70,14 +70,12 @@ else:
 metaConversaoFormatada = f"{metaConversaoQtd} clientes"
 incrementoFormatado = formataReal(incrementoFaturamento)
 
-#Gráfico de projeções de vendas e faturamento
+#gráfico de projeções de vendas e faturamento
 if not df.empty and df['data_venda'].notna().any():
     df['data_venda'] = pd.to_datetime(df['data_venda'], errors='coerce')
-    # Agrupa por Ano e Mês (Ex: 2026-08)
     dfMensal = df.groupby(df['data_venda'].dt.to_period('M'))['valor_total'].sum().reset_index()
     dfMensal['data_venda'] = dfMensal['data_venda'].astype(str)
     
-    # Se houver apenas 1 mês na base, adicionamos meses anteriores para formar o histórico visual
     if len(dfMensal) == 1:
         mesAtualStr = dfMensal['data_venda'].iloc[0]
         valAtual = dfMensal['valor_total'].iloc[0]
@@ -87,25 +85,20 @@ if not df.empty and df['data_venda'].notna().any():
             'valor_total': [valAtual * 0.70, valAtual * 0.82, valAtual * 0.91, valAtual]
         })
 else:
-    # Dados de fallback caso a coluna de data esteja vazia
     dfMensal = pd.DataFrame({
         'data_venda': ['2026-05', '2026-06', '2026-07', '2026-08'],
         'valor_total': [18500.00, 22100.00, 24800.00, faturamento if faturamento > 0 else 29500.00]
     })
 
-# Cálculo da Expectativa de Melhora (Meta do próximo mês: +15%)
-# ultimoMesVal = dfMensal['valor_total'].iloc[-1]
-# expectativaVal = ultimoMesVal * 1.15  # Projeção de +15% de crescimento
+#cálculo da Expectativa de Melhora (Meta do mês: +10%)
 dfMensal['expectativa'] = dfMensal['valor_total'] * 1.10
 
-# Listas de dados para o gráfico
+#listas de dados para o gráfico
 eixo_x = list(dfMensal['data_venda'])
-# eixo_x_real = list(dfMensal['data_venda'])
-# eixo_y_real = list(dfMensal['valor_total'])
 
 figHistorico = go.Figure()
 
-# Barras de Histórico Real
+#barras de Histórico Real
 figHistorico.add_trace(go.Bar(
     x=eixo_x,
     y=dfMensal['valor_total'],
@@ -115,7 +108,7 @@ figHistorico.add_trace(go.Bar(
     textposition='outside'
 ))
 
-# Barra da Projeção / Expectativa do Próximo Mês
+#barra da Projeção / Expectativa do Próximo Mês
 figHistorico.add_trace(go.Bar(
     x=eixo_x,
     y=dfMensal['expectativa'],
@@ -132,7 +125,7 @@ figHistorico.update_layout(
     plot_bgcolor='rgba(0,0,0,0)',
     yaxis=dict(showgrid=True, gridcolor='#E0E6ED', tickprefix='R$ '),
     xaxis=dict(
-        type='category', # <--- ESSENCIAL: Impede que o Plotly tente ler como data e oculta a meta
+        type='category',
         title='Mês'
     ),
     yaxis_title='Faturamento Total',
@@ -141,7 +134,7 @@ figHistorico.update_layout(
 )
 
 
-#Gráfico 1 : Barras - Vendas por mês
+#gráfico 1 : barras - Vendas por mês
 if not df.empty and 'produto' in df.columns:
     dfProduto = df.groupby('produto')['valor_total'].sum().reset_index()
     dfProduto = dfProduto.sort_values(by='valor_total', ascending=True)
@@ -169,7 +162,7 @@ figProduto.update_layout(
 )
 figProduto.update_traces()
 
-# Gráfico 2: Rosca - Vendas por Faixa Etária
+#gráfico 2: Rosca - Vendas por Faixa Etária
 if not df.empty and 'faixa_etaria' in df.columns:
     dfFaixaEtaria = df.groupby('faixa_etaria')['valor_total'].sum().reset_index()
 else:
@@ -193,7 +186,7 @@ fig_faixa_etaria.update_layout(
 
 fig_faixa_etaria.update_traces(marker=dict(line=dict(color='#FFFFFF', width=2)))
 
-# Gráfico 3: barras - Vendas por Região
+#gráfico 3: barras - Vendas por Região
 if not df.empty and 'regiao' in df.columns:
     dfRegiao = df.groupby('regiao')['valor_total'].sum().reset_index()
     dfRegiao = dfRegiao.sort_values(by='valor_total', ascending=True)
@@ -219,7 +212,7 @@ figRegiao.update_layout(
 )
 figRegiao.update_traces()
 
-# Gráfico 4: Funil de Conversão / Nível de Fidelidade
+#gráfico 4: funil de Conversão / Nível de Fidelidade
 if not df.empty and 'nivel_fidelidade' in df.columns:
     # Agrupa e ordena os dados para formar o funil
     dfFunil = df.groupby('nivel_fidelidade')['valor_total'].sum().reset_index()
@@ -231,7 +224,7 @@ else:
         'valor_total': [10000, 5000, 2500, total_vendas]
     })
 
-# Criação do gráfico de funil com Plotly Express
+#criação do gráfico de funil com Plotly Express
 figFunil = px.funnel(
     dfFunil, 
     x='valor_total', 
@@ -239,7 +232,7 @@ figFunil = px.funnel(
     color_discrete_sequence=[cores[0]]
 )
 
-# Ajuste de layout mantendo o padrão visual do seu dashboard
+# ajuste de layout mantendo o padrão visual do seu dashboard
 figFunil.update_layout(
     margin=dict(l=10, r=10, t=10, b=10),
     paper_bgcolor='rgba(0,0,0,0)',
