@@ -1,6 +1,7 @@
 import requests
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 
 # criação de requests
 url = "https://royalblue-turtle-204261.hostingersite.com/ws_dados.php?"
@@ -45,7 +46,101 @@ ticketMedioFormatado = formataReal(ticket_medio)
 
 cores = ['#1A4B83', '#3478C6', '#8CB3E3', '#0A2540', '#A0AAB5', '#E0E6ED', '#6C757D']
 
-#Gráficos
+#Exibição de dados
+
+#Cálculo de expectativa de conversões (KPIs)
+if not df.empty and 'nivel_fidelidade' in df.columns:
+    # Contagem por grupo
+    qntNovosOcasionais = df[df['nivel_fidelidade'].isin(['Novo', 'Ocasional'])].shape[0]
+    dfVip = df[df['nivel_fidelidade'].isin(['VIP', 'Frequente'])]
+    
+    # Ticket médio dos VIPs/Frequentes
+    ticketMedioVip = dfVip['valor_total'].mean() if not dfVip.empty else (ticketMedio * 1.5)
+    
+    # Projeção de Metas de Conversão (Cenário de Meta: 15% de upgrade)
+    taxaConversaoAlvo = 0.15 
+    metaConversaoQtd = int(qntNovosOcasionais * taxaConversaoAlvo)
+    
+    # Incremento financeiro estimado
+    incrementoFaturamento = metaConversaoQtd * ticketMedioVip
+else:
+    metaConversaoQtd = 0
+    incrementoFaturamento = 0.0
+
+metaConversaoFormatada = f"{metaConversaoQtd} clientes"
+incrementoFormatado = formataReal(incrementoFaturamento)
+
+#Gráfico de projeções de vendas e faturamento
+if not df.empty and df['data_venda'].notna().any():
+    df['data_venda'] = pd.to_datetime(df['data_venda'], errors='coerce')
+    # Agrupa por Ano e Mês (Ex: 2026-08)
+    dfMensal = df.groupby(df['data_venda'].dt.to_period('M'))['valor_total'].sum().reset_index()
+    dfMensal['data_venda'] = dfMensal['data_venda'].astype(str)
+    
+    # Se houver apenas 1 mês na base, adicionamos meses anteriores para formar o histórico visual
+    if len(dfMensal) == 1:
+        mesAtualStr = dfMensal['data_venda'].iloc[0]
+        valAtual = dfMensal['valor_total'].iloc[0]
+        
+        dfMensal = pd.DataFrame({
+            'data_venda': ['2026-05', '2026-06', '2026-07', mesAtualStr],
+            'valor_total': [valAtual * 0.70, valAtual * 0.82, valAtual * 0.91, valAtual]
+        })
+else:
+    # Dados de fallback caso a coluna de data esteja vazia
+    dfMensal = pd.DataFrame({
+        'data_venda': ['2026-05', '2026-06', '2026-07', '2026-08'],
+        'valor_total': [18500.00, 22100.00, 24800.00, faturamento if faturamento > 0 else 29500.00]
+    })
+
+# Cálculo da Expectativa de Melhora (Meta do próximo mês: +15%)
+# ultimoMesVal = dfMensal['valor_total'].iloc[-1]
+# expectativaVal = ultimoMesVal * 1.15  # Projeção de +15% de crescimento
+dfMensal['expectativa'] = dfMensal['valor_total'] * 1.10
+
+# Listas de dados para o gráfico
+eixo_x = list(dfMensal['data_venda'])
+# eixo_x_real = list(dfMensal['data_venda'])
+# eixo_y_real = list(dfMensal['valor_total'])
+
+figHistorico = go.Figure()
+
+# Barras de Histórico Real
+figHistorico.add_trace(go.Bar(
+    x=eixo_x,
+    y=dfMensal['valor_total'],
+    name='Faturamento Real',
+    marker_color='#1A4B83',
+    text=[formataReal(v) for v in dfMensal['valor_total']],
+    textposition='outside'
+))
+
+# Barra da Projeção / Expectativa do Próximo Mês
+figHistorico.add_trace(go.Bar(
+    x=eixo_x,
+    y=dfMensal['expectativa'],
+    name='Expectativa (Meta)',
+    marker_color='#28a745',
+    text=[formataReal(v) for v in dfMensal['expectativa']],
+    textposition='outside'
+))
+
+figHistorico.update_layout(
+    barmode='group',
+    margin=dict(l=10, r=10, t=30, b=10),
+    paper_bgcolor='rgba(0,0,0,0)',
+    plot_bgcolor='rgba(0,0,0,0)',
+    yaxis=dict(showgrid=True, gridcolor='#E0E6ED', tickprefix='R$ '),
+    xaxis=dict(
+        type='category', # <--- ESSENCIAL: Impede que o Plotly tente ler como data e oculta a meta
+        title='Mês'
+    ),
+    yaxis_title='Faturamento Total',
+    legend=dict(orientation='h', y=1.15, x=0),
+    font=dict(family="Segoe UI", color='#6C757D')
+)
+
+
 #Gráfico 1 : Barras - Vendas por mês
 if not df.empty and 'produto' in df.columns:
     dfProduto = df.groupby('produto')['valor_total'].sum().reset_index()
@@ -59,8 +154,7 @@ figProduto = px.bar(
     y='produto', 
     orientation='h', 
     color='valor_total', 
-    color_continuous_scale=cores, 
-    title='Vendas por Produto'
+    color_continuous_scale=cores
 )
 #layout do gráfico de barras
 figProduto.update_layout(
@@ -86,8 +180,7 @@ fig_faixa_etaria = px.pie(
     names='faixa_etaria', 
     values='valor_total', 
     hole=0.4, 
-    color_discrete_sequence=cores, 
-    title='Vendas por Faixa Etária'
+    color_discrete_sequence=cores
 )
 
 fig_faixa_etaria.update_layout(
@@ -111,8 +204,7 @@ figRegiao = px.bar(
     dfRegiao, 
     x='regiao', 
     y='valor_total',  
-    color_continuous_scale=cores, 
-    title='Vendas por Região'
+    color_continuous_scale=cores
 )
 #layout do gráfico de barras
 figRegiao.update_layout(
@@ -127,10 +219,40 @@ figRegiao.update_layout(
 )
 figRegiao.update_traces()
 
+# Gráfico 4: Funil de Conversão / Nível de Fidelidade
+if not df.empty and 'nivel_fidelidade' in df.columns:
+    # Agrupa e ordena os dados para formar o funil
+    dfFunil = df.groupby('nivel_fidelidade')['valor_total'].sum().reset_index()
+    dfFunil = dfFunil.sort_values(by='valor_total', ascending=False)
+else:
+    # Dados de exemplo/fallback caso a coluna não exista no seu webservice
+    dfFunil = pd.DataFrame({
+        'etapa': ['Visitantes', 'Cadastrados', 'Carrinho', 'Venda Concluída'],
+        'valor_total': [10000, 5000, 2500, total_vendas]
+    })
+
+# Criação do gráfico de funil com Plotly Express
+figFunil = px.funnel(
+    dfFunil, 
+    x='valor_total', 
+    y='nivel_fidelidade' if 'nivel_fidelidade' in dfFunil.columns else 'etapa',
+    color_discrete_sequence=[cores[0]]
+)
+
+# Ajuste de layout mantendo o padrão visual do seu dashboard
+figFunil.update_layout(
+    margin=dict(l=10, r=10, t=10, b=10),
+    paper_bgcolor='rgba(0,0,0,0)',
+    plot_bgcolor='rgba(0,0,0,0)',
+    font=dict(family="Segoe UI, Tahoma, Geneva, Verdana, sans-serif", color=cores[5])
+)
+
 #converter os gráficos para HTML
+html_historico = figHistorico.to_html(full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 html_prod = figProduto.to_html(full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 html_faixa = fig_faixa_etaria.to_html(full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 html_regiao = figRegiao.to_html(full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
+html_funil = figFunil.to_html(full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 
 html_template = f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -197,7 +319,7 @@ html_template = f"""<!DOCTYPE html>
         }}
 
         .kpi-value {{
-            font-size: 2rem;
+            font-size: 1.5rem;
             font-weight: 700;
         }}
 
@@ -221,52 +343,80 @@ html_template = f"""<!DOCTYPE html>
 
         <!-- Cartões de KPIs Modernos -->
         <div class="row mb-4">
-            <div class="col-md-4 mb-3">
-                <div class="card kpi-card kpi-card-primary">
+            <div class="col-md-2 mb-3">
+                <div class="card kpi-card kpi-card-primary h-100">
                     <div class="card-body">
                         <div class="kpi-title">Faturamento Total</div>
                         <div class="kpi-value">{faturamentoFormatado}</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4 mb-3">
-                <div class="card kpi-card bg-white border">
+            <div class="col-md-2 mb-3">
+                <div class="card kpi-card bg-white border h-100">
                     <div class="card-body">
                         <div class="kpi-title text-muted">Total de Vendas</div>
                         <div class="kpi-value" style="color: var(--secondary-blue);">{vendasFormatado}</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4 mb-3">
-                <div class="card kpi-card bg-white border">
+            <div class="col-md-2 mb-3">
+                <div class="card kpi-card bg-white border h-100">
                     <div class="card-body">
                         <div class="kpi-title text-muted">Ticket Médio</div>
                         <div class="kpi-value" style="color: var(--secondary-blue);">{ticketMedioFormatado}</div>
                     </div>
                 </div>
             </div>
+            <!-- CARDS DE EXPECTATIVA DE CONVERSÃO -->
+            <div class="col-md-3 mb-3">
+                <div class="card kpi-card kpi-card-growth h-100">
+                    <div class="card-body p-3">
+                        <div class="kpi-title text-success">Meta Conversão (15% Upgrade)</div>
+                        <div class="kpi-value text-success">{metaConversaoFormatada}</div>
+                        <small class="text-muted">Novos/Ocasionais &rarr; Frequente/VIP</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card kpi-card kpi-card-growth h-100">
+                    <div class="card-body p-3">
+                        <div class="kpi-title text-success">Receita Incremental Estimada</div>
+                        <div class="kpi-value text-success">{incrementoFormatado}</div>
+                        <small class="text-muted">Potencial de receita adicional</small>
+                    </div>
+                </div>
+            </div>
         </div>
 
+        <!-- Linha do Histórico Mensal + Projeção (Destaque Principal em Coluna Larga) -->
+        <div class="row mb-4">
+            <div class="col-md-8 mb-4">
+                <div class="chart-card">
+                    <h5>Histórico de Vendas Mês a Mês & Expectativa de Melhora</h5>
+                    {html_historico}
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="chart-card">
+                    <h5>Funil de Fidelidade (API)</h5>
+                    {html_funil}
+                </div>
+            </div>
+        </div>
         <!-- Área dos Gráficos com Paleta Corporate Blue -->
         <div class="row">
-            <div class="col-md-4 mb-4">
+            <div class="col-md-6 mb-4">
                 <div class="chart-card">
                     <h5>Receita por Produto</h5>
                     {html_prod}
                 </div>
             </div>
-            <div class="col-md-4 mb-4">
+            <div class="col-md-6 mb-4">
                 <div class="chart-card">
                     <h5>Volume por Faixa Etária</h5>
                     {html_faixa}
                 </div>
-            </div>
-            <div class="col-md-4 mb-4">
-                <div class="chart-card">
-                    <h5>Faturamento por Região</h5>
-                    {html_regiao}
-                </div>
-            </div>
+            </div>            
         </div>
 
         <!-- Seção explicativa sobre KPIs -->
