@@ -227,6 +227,8 @@ html_template = f"""<!DOCTYPE html>
 </head>
 <body class="p-2">
 
+    <div id="header-container"></div>
+
     <div class="container-fluid">
         <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
             <h2><span class="text-gray">Cotas Comercializadas por Seguimento e Administradoras (Consórcios)</span></h2>
