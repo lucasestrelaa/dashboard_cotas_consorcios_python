@@ -1,6 +1,8 @@
 <div align="center">
   <h1>📊 Dashboard de Análise de Dados</h1>
-  <p><i>Mini projeto de visualização e análise de dados interativa usando Python e Plotly.</i></p>
+  <p><i>Projeto de visualização e análise de dados interativa usando Python e Plotly.</i></p>
+
+  Com base nos dados disponíveis no [Dados do Sistema de Consórcios — ABAC](https://abac.org.br/downloads/dados-do-sistema-de-consorcios/?utm_source=chatgpt.com)
 
   <!-- Badges indicando as tecnologias -->
   <img src="https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
