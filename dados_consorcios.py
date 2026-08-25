@@ -316,7 +316,7 @@ html_template = f"""<!DOCTYPE html>
         <div class="row mb-4 g-3">          
             <div class="col-md-12">
                 <div class="chart-card">
-                    <h5 class="mb-3" style="color: var(--primary-blue);">Evolução Mensal por Segmento</h5>
+                    <h5 class="mb-3 fw-bold" style="color: var(--primary-blue);">Evolução Mensal por Segmento</h5>
                     <div class="chart-scroll-container">
                         {chart_html}
                     </div>
@@ -324,7 +324,7 @@ html_template = f"""<!DOCTYPE html>
             </div>
             <div class="col-md-12">
                 <div class="chart-card">
-                    <h5 class="mb-3" style="color: var(--primary-blue);">Cotas Comercializadas por Administradoras</h5>
+                    <h5 class="mb-3 fw-bold" style="color: var(--primary-blue);">Cotas Comercializadas por Administradoras</h5>
                     <div class="chart-scroll-container">
                         {chart_admin_html}
                     </div>
