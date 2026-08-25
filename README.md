@@ -17,7 +17,7 @@
 
 <h2>📌 Sobre o Projeto</h2>
 <p>
-  Este mini projeto foi desenvolvido para analisar o perfil dos clientes e as vendas geradas. 
+  Este Projeto foi desenvolvido para analisar cotas de consórcios. 
   A aplicação processa os dados e gera gráficos dinâmicos para facilitar a tomada de decisão.
 </p>
 
@@ -27,8 +27,9 @@
 
 <ul>
   <li><b>Tratamento de Dados:</b> Manipulação de dados com Pandas para estruturação do dataset.</li>
-  <li><b>Gráfico de Rosca / Pizza:</b> Distribuição das vendas por <b>faixa etária</b> utilizando a biblioteca Plotly Express.</li>
-  <li><b>Gráficos de Barras:</b> Comparativo das vendas por produto e faturamento total.</li>
+  <li><b>KPIs:</b> Indicadores referentes as cotas de consórcios.</li>
+  <li><b>Gráficos de Barras Vertical:</b> Comparativo de evolução mensal das cotas de consórcios.</li>
+  <li><b>Gráficos de Barras Horizontal:</b> Comparativo de evolução mensal das cotas de consórcios.</li>
   <li><b>Tratamento de Erros:</b> Ajuste e compatibilização de parâmetros entre versões do Plotly (como correção do mapeamento de colunas e compatibilidade de cantos arredondados).</li>
 </ul>
 
