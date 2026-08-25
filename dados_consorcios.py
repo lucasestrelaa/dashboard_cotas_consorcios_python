@@ -251,10 +251,9 @@ html_template = f"""<!DOCTYPE html>
                         {"".join([f'<option value="{a}">{a}</option>' for a in variavel_administradoras])}
                     </select>
                 </div>
-                <div class="col-md-3">
-                    <button class="btn btn-primary w-100 fw-bold" onclick="resetarFiltros()" style="background-color: var(--accent-gray); border-color: var(--accent-gray);">
-                        Filtro Geral (Limpar)
-                    </button>
+                <div class="col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary fw-bold" style="background-color: var(--primary-blue)" onclick="aplicarFiltros()">Filtrar</button>
+                    <button class="btn btn-outline-secondary fw-bold" onclick="resetarFiltros()">Limpar</button>
                 </div>
             </div>
         </div>
