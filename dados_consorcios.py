@@ -324,7 +324,7 @@ html_template = f"""<!DOCTYPE html>
             </div>
             <div class="col-md-12">
                 <div class="chart-card">
-                    <h5 class="mb-3" style="color: var(--primary-blue); font-size: 1rem;">Cotas Comercializadas por Administradoras</h5>
+                    <h5 class="mb-3" style="color: var(--primary-blue);">Cotas Comercializadas por Administradoras</h5>
                     <div class="chart-scroll-container">
                         {chart_admin_html}
                     </div>
