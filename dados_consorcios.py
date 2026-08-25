@@ -3,11 +3,6 @@ import requests
 import pandas as pd
 import plotly.graph_objects as go
 
-#novas implementações 
-# - colocar as cores depois de filtrar (está assumindo a primeira cor, quando está no geral as cores estão certas)
-# - hints nos quadros de kpi (ex: melhor mês da série, média por operação, total de registros exibidos)
-
-
 # 1. Requisição à API
 url = "https://royalblue-turtle-204261.hostingersite.com/ws_dados.php?tipo_pesquisa=1"
 
@@ -61,22 +56,30 @@ dataInicio = variavel_todos_meses[0] if variavel_todos_meses else "N/A"
 dataFim = variavel_todos_meses[-1] if variavel_todos_meses else "N/A"
 
 # -------------------------------------------------------------
-# 4. CRIAÇÃO DO GRÁFICO PLOTLY DIRETAMENTE NO PYTHON
+# CALCULAR O MELHOR SEGMENTO GLOBAL (ESTÁTICO / FIXO DA BASE INTEIRA)
 # -------------------------------------------------------------
-df_validos = df[df['data_referencia'] != 'Indefinido']
+df_seg_global = df.groupby('segmento')['quantidade'].sum().reset_index()
+df_seg_global = df_seg_global.sort_values(by='quantidade', ascending=False)
 
-if not df_validos.empty:
-    soma_por_mes = df_validos.groupby('data_referencia')['quantidade'].sum()
-    melhor_mes_nome = soma_por_mes.idxmax()
-    melhor_mes_valor = soma_por_mes.max()
-    texto_melhor_mes_python = f"{melhor_mes_nome} ({melhor_mes_valor:,.0f})".replace(',', '.')
+if not df_seg_global.empty:
+    melhor_seg_global_nome = df_seg_global.iloc[0]['segmento']
+    melhor_seg_global_qtd = f"{df_seg_global.iloc[0]['quantidade']:,}".replace(',', '.')
+    melhor_seg_global_texto = f"{melhor_seg_global_nome} ({melhor_seg_global_qtd})"
 else:
-    texto_melhor_mes_python = "N/A"
+    melhor_seg_global_texto = "N/A"
 
-cores = ['#1A4B83', '#28A745', '#E67E22', '#8E44AD', '#17A2B8', '#D9534F', '#F39C12', '#34495E']
+# -------------------------------------------------------------
+# 4. MAPEAMENTO FIXO DE CORES POR SEGMENTO
+# -------------------------------------------------------------
+paleta_cores = ['#1A4B83', '#28A745', '#E67E22', '#8E44AD', '#17A2B8', '#D9534F', '#F39C12', '#34495E']
+mapa_cores_segmentos = {seg: paleta_cores[i % len(paleta_cores)] for i, seg in enumerate(variavel_segmentos)}
+
+# -------------------------------------------------------------
+# 5. GERAR GRÁFICOS PLOTLY INICIAIS (PYTHON)
+# -------------------------------------------------------------
 fig = go.Figure()
 
-for index, seg in enumerate(variavel_segmentos):
+for seg in variavel_segmentos:
     df_seg = df[df['segmento'] == seg]
     agrupado = df_seg.groupby('data_referencia')['quantidade'].sum().to_dict()
     valores = [agrupado.get(m, 0) for m in variavel_todos_meses]
@@ -85,7 +88,7 @@ for index, seg in enumerate(variavel_segmentos):
         x=variavel_todos_meses,
         y=valores,
         name=seg,
-        marker_color=cores[index % len(cores)],
+        marker_color=mapa_cores_segmentos[seg],
         text=[f"{v:,}".replace(',', '.') if v > 0 else '' for v in valores],
         textposition='outside',
         hovertemplate='<b>%{fullData.name}</b><br>Qtd: %{y:,.0f}<extra></extra>'
@@ -103,13 +106,43 @@ fig.update_layout(
     font=dict(family="Segoe UI", color='#6C757D')
 )
 
-# Converte o gráfico criado no Python para HTML Div estático/inicial
+df_admin = df.groupby('administradora')['quantidade'].sum().reset_index()
+df_admin = df_admin.sort_values(by='quantidade', ascending=True)
+
+fig_admin = go.Figure()
+
+fig_admin.add_trace(go.Bar(
+    x=df_admin['quantidade'],
+    y=df_admin['administradora'],
+    orientation='h',
+    marker_color='#1A4B83',
+    text=[f"{v:,}".replace(',', '.') if v > 0 else '' for v in df_admin['quantidade']],
+    textposition='outside',
+    hovertemplate='<b>%{y}</b><br>Total: %{x:,.0f}<extra></extra>'
+))
+
+altura_inicial_admin = max(400, len(df_admin) * 45)
+
+fig_admin.update_layout(
+    height=altura_inicial_admin,
+    bargap=0.15,
+    margin=dict(l=140, r=50, t=20, b=40),
+    paper_bgcolor='rgba(0,0,0,0)',
+    plot_bgcolor='rgba(0,0,0,0)',
+    xaxis=dict(showgrid=True, gridcolor='#E0E6ED', title='Qtd Total'),
+    yaxis=dict(type='category', title=''),
+    font=dict(family="Segoe UI", color='#6C757D')
+)
+
 chart_html = fig.to_html(full_html=False, include_plotlyjs=False, div_id="plotlyChart")
+chart_admin_html = fig_admin.to_html(full_html=False, include_plotlyjs=False, div_id="plotlyChartAdmin")
 
-# Converte o DataFrame limpo para JSON para re-filtragem dinâmica no JS
 dados_json_str = df.to_json(orient='records')
+mapa_cores_json = json.dumps(mapa_cores_segmentos)
 
-# 5. Geração do HTML + JS
+# -------------------------------------------------------------
+# 6. HTML TEMPLATE + JS
+# -------------------------------------------------------------
 html_template = f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -118,16 +151,15 @@ html_template = f"""<!DOCTYPE html>
     <title>Dashboard de Consórcios</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Plotly.js -->
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 
     <style>
         :root {{
             --primary-blue: #1A4B83;
-            --secondary-blue: #3478C6;
-            --accent-blue: #0A2540;
-            --bg-light: #F4F7FA;
-            --card-bg: #FFFFFF;
+            --secondary-blue: #424242;
+            --accent-gray: #595858;
+            --bg-light: #FFFFFF;
+            --card-bg: #fcfafa;
             --border-color: #E0E6ED;
         }}
         body {{
@@ -135,7 +167,7 @@ html_template = f"""<!DOCTYPE html>
             color: #333;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }}
-        h2 {{ color: var(--accent-blue); font-weight: 700; }}
+        .text-gray {{ color: var(--accent-gray); font-weight: 700; }}
         .kpi-card {{
             border: none;
             border-radius: 10px;
@@ -147,14 +179,17 @@ html_template = f"""<!DOCTYPE html>
             color: #FFFFFF;
         }}
         .kpi-title {{
-            font-size: 0.85rem;
+            font-size: 0.78rem;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            opacity: 0.8;
+            opacity: 0.85;
+            font-weight: 600;
         }}
         .kpi-value {{
-            font-size: 1.6rem;
+            font-size: 1.35rem;
             font-weight: 700;
+        }}
+        .kpi-value-segmento {{
+            font-size: 1.20rem;
         }}
         .chart-card {{
             background-color: var(--card-bg);
@@ -162,21 +197,39 @@ html_template = f"""<!DOCTYPE html>
             border-radius: 10px;
             padding: 1.5rem;
             box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            height: 520px;
+            display: flex;
+            flex-direction: column;
+        }}
+        .chart-scroll-container {{
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
         }}
         .filter-section {{
-            background-color: #FFFFFF;
+            background-color: var(--card-bg);
             border-radius: 10px;
             padding: 1rem 1.5rem;
             border: 1px solid var(--border-color);
             margin-bottom: 1.5rem;
         }}
+        .col-kpi {{
+            flex: 0 0 auto;
+            width: 20%;
+        }}
+        @media (max-width: 991px) {{
+            .col-kpi {{ width: 50%; }}
+        }}
+        @media (max-width: 575px) {{
+            .col-kpi {{ width: 100%; }}
+        }}
     </style>
 </head>
-<body class="p-4">
+<body class="p-2">
 
-    <div class="container">
+    <div class="container-fluid">
         <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
-            <h2>Cotas comercializadas de Consórcios</h2>
+            <h2><span class="text-gray">Cotas Comercializadas por Seguimento e Administradoras (Consórcios)</span></h2>
             <span class="text-muted">Dados recuperados via Python</span>
         </div>
 
@@ -198,7 +251,7 @@ html_template = f"""<!DOCTYPE html>
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <button class="btn btn-primary w-100 fw-bold" onclick="resetarFiltros()">
+                    <button class="btn btn-primary w-100 fw-bold" onclick="resetarFiltros()" style="background-color: var(--accent-gray); border-color: var(--accent-gray);">
                         Filtro Geral (Limpar)
                     </button>
                 </div>
@@ -206,47 +259,81 @@ html_template = f"""<!DOCTYPE html>
         </div>
 
         <!-- KPIS -->
-        <div class="row mb-4">
-            <div class="col-md-4 mb-3">
-                <div class="card kpi-card kpi-card-primary h-100">
+        <div class="row mb-4 g-3">
+            <div class="col-kpi">
+                <div class="card kpi-card border h-100">
                     <div class="card-body">
-                        <div class="kpi-title">Quantidade Total Comercializada (Período {dataInicio} - {dataFim})</div>
-                        <div class="kpi-value" id="kpiTotalQtd">0</div>
+                        <div class="kpi-title text-muted">Melhor Segmento (Geral)</div>
+                        <div class="kpi-value kpi-value-segmento text-truncate" style="color: var(--primary-blue);" id="kpiMelhorSegmento" title="{melhor_seg_global_texto}">{melhor_seg_global_texto}</div>
+                        <small class="text-muted">Campeão da base (Fixo)</small>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4 mb-3">
+
+            <div class="col-kpi">
                 <div class="card kpi-card border h-100">
                     <div class="card-body">
                         <div class="kpi-title text-muted">Melhor Mês da Série</div>
-                        <div class="kpi-value" style="color: var(--secondary-blue);" id="kpiMelhorMes">0</div>
+                        <div class="kpi-value text-success" id="kpiMelhorMes">0</div>
+                        <small class="text-muted">Mês com pico de vendas</small>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4 mb-3">
+
+            <div class="col-kpi">
                 <div class="card kpi-card border h-100">
                     <div class="card-body">
                         <div class="kpi-title text-muted">Média por Operação</div>
                         <div class="kpi-value" style="color: var(--secondary-blue);" id="kpiMedia">0</div>
+                        <small class="text-muted">Média por registro exibido</small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-kpi">
+                <div class="card kpi-card border h-100">
+                    <div class="card-body">
+                        <div class="kpi-title text-muted">Qtd de Clientes / Registros</div>
+                        <div class="kpi-value text-info" id="kpiTotalClientes">0</div>
+                        <small class="text-muted">Total da amostra exibida</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-kpi">
+                <div class="card kpi-card kpi-card-primary h-100">
+                    <div class="card-body">
+                        <div class="kpi-title">Qtd Total Comercializada</div>
+                        <div class="kpi-value" id="kpiTotalQtd">0</div>
+                        <small class="opacity-75">Período: {dataInicio} - {dataFim}</small>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- GRÁFICO GERADO PELO PYTHON E INJETADO -->
-        <div class="row mb-4">
+        <!-- GRÁFICOS -->
+        <div class="row mb-4 g-3">          
             <div class="col-md-12">
                 <div class="chart-card">
                     <h5 class="mb-3" style="color: var(--primary-blue);">Evolução Mensal por Segmento</h5>
-                    {chart_html}
+                    <div class="chart-scroll-container">
+                        {chart_html}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-12">
+                <div class="chart-card">
+                    <h5 class="mb-3" style="color: var(--primary-blue); font-size: 1rem;">Cotas Comercializadas por Administradoras</h5>
+                    <div class="chart-scroll-container">
+                        {chart_admin_html}
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- SCRIPT JS PARA MANTER A INTERATIVIDADE DOS FILTROS -->
     <script>
         const rawData = {dados_json_str};
+        const mapCoresSegmentos = {mapa_cores_json};
 
         function aplicarFiltros() {{
             const segSelecionado = document.getElementById("selectSegmento").value;
@@ -260,6 +347,7 @@ html_template = f"""<!DOCTYPE html>
 
             atualizarKPIs(dadosFiltrados);
             atualizarGraficoPorSegmento(dadosFiltrados);
+            atualizarGraficoAdmin(dadosFiltrados);
         }}
 
         function resetarFiltros() {{
@@ -270,30 +358,33 @@ html_template = f"""<!DOCTYPE html>
 
         function atualizarKPIs(dados) {{
             let totalQtd = dados.reduce((acc, curr) => acc + (parseInt(curr.quantidade) || 0), 0);
-            let totalRegistros = dados.length;
-            let media = totalRegistros > 0 ? (totalQtd / totalRegistros).toFixed(1) : 0;
+            let totalClientes = dados.length;
+            let media = totalClientes > 0 ? (totalQtd / totalClientes).toFixed(1) : 0;
 
             let somaPorMes = {{}};
+
             dados.forEach(item => {{
                 let mes = item.data_referencia;
+                let qtd = parseInt(item.quantidade) || 0;
+
                 if (mes && mes !== 'Indefinido') {{
-                    somaPorMes[mes] = (somaPorMes[mes] || 0) + (parseInt(item.quantidade) || 0);
+                    somaPorMes[mes] = (somaPorMes[mes] || 0) + qtd;
                 }}
             }});
 
             let melhorMes = "N/A";
-            let maiorValor = -1;
-
+            let maiorValorMes = -1;
             Object.keys(somaPorMes).forEach(mes => {{
-                if (somaPorMes[mes] > maiorValor) {{
-                    maiorValor = somaPorMes[mes];
+                if (somaPorMes[mes] > maiorValorMes) {{
+                    maiorValorMes = somaPorMes[mes];
                     melhorMes = mes;
                 }}
             }});
 
-            let textoMelhorMes = maiorValor > 0 ? `${{melhorMes}} (${{maiorValor.toLocaleString('pt-BR')}})` : "N/A";
+            let textoMelhorMes = maiorValorMes > 0 ? `${{melhorMes}} (${{maiorValorMes.toLocaleString('pt-BR')}})` : "N/A";
 
             document.getElementById("kpiTotalQtd").innerText = totalQtd.toLocaleString('pt-BR');
+            document.getElementById("kpiTotalClientes").innerText = totalClientes.toLocaleString('pt-BR');
             document.getElementById("kpiMelhorMes").innerText = textoMelhorMes;
             document.getElementById("kpiMedia").innerText = media.replace('.', ',');
         }}
@@ -332,19 +423,14 @@ html_template = f"""<!DOCTYPE html>
                 }}
             }});
 
-            const cores = [
-                '#1A4B83', '#28A745', '#E67E22', '#8E44AD', 
-                '#17A2B8', '#D9534F', '#F39C12', '#34495E'
-            ];
-
-            let traces = segmentos.map((seg, index) => {{
+            let traces = segmentos.map(seg => {{
                 let valores = meses.map(m => dadosAgrupados[seg][m]);
                 return {{
                     x: meses,
                     y: valores,
                     name: seg,
                     type: 'bar',
-                    marker: {{ color: cores[index % cores.length] }},
+                    marker: {{ color: mapCoresSegmentos[seg] || '#1A4B83' }},
                     text: valores.map(v => v > 0 ? v.toLocaleString('pt-BR') : ''),
                     textposition: 'outside',
                     hovertemplate: '<b>%{{fullData.name}}</b><br>Qtd: %{{y:,.0f}}<extra></extra>'
@@ -366,16 +452,79 @@ html_template = f"""<!DOCTYPE html>
             Plotly.react('plotlyChart', traces, layout);
         }}
 
+        function atualizarGraficoAdmin(dados) {{
+            let agrupadoAdmin = {{}};
+
+            dados.forEach(item => {{
+                let admin = item.administradora || 'Não Informada';
+                agrupadoAdmin[admin] = (agrupadoAdmin[admin] || 0) + (parseInt(item.quantidade) || 0);
+            }});
+
+            let arrayAdmin = Object.keys(agrupadoAdmin).map(admin => ({{
+                nome: admin,
+                qtd: agrupadoAdmin[admin]
+            }}));
+
+            arrayAdmin.sort((a, b) => a.qtd - b.qtd);
+
+            let admins = arrayAdmin.map(item => item.nome);
+            let valores = arrayAdmin.map(item => item.qtd);
+
+            let trace = [{{
+                x: valores,
+                y: admins,
+                type: 'bar',
+                orientation: 'h',
+                marker: {{ color: '#1A4B83' }},
+                text: valores.map(v => v > 0 ? v.toLocaleString('pt-BR') : ''),
+                textposition: 'outside',
+                hovertemplate: '<b>%{{y}}</b><br>Total: %{{x:,.0f}}<extra></extra>'
+            }}];
+
+            let alturaDinamica = Math.max(350, admins.length * 40);
+
+            let layout = {{
+                height: alturaDinamica,
+                bargap: 0.15,
+                margin: {{ l: 140, r: 50, t: 20, b: 40 }},
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                xaxis: {{ showgrid: true, gridcolor: '#E0E6ED', title: 'Qtd Total' }},
+                yaxis: {{ type: 'category', title: '' }},
+                font: {{ family: "Segoe UI", color: '#6C757D' }}
+            }};
+
+            Plotly.react('plotlyChartAdmin', trace, layout);
+        }}
+
         document.addEventListener("DOMContentLoaded", function() {{
             aplicarFiltros();
         }});
+
+        fetch('header.html')
+        .then(response => response.text())
+        .then(data => {{
+            document.getElementById('header-container').innerHTML = data;
+
+            // Destaca automaticamente o link da página atual com a classe 'active'
+            const currentPage = window.location.pathname.split('/').pop() || 'index.html';
+            const links = document.querySelectorAll('.navbar-custom .nav-link');
+            
+            links.forEach(link => {{
+                if (link.getAttribute('href') === currentPage) {{
+                    link.classList.add('active');
+                }}
+            }});
+        }})
+        .catch(error => console.error('Erro ao carregar o header:', error));
+    
     </script>
 </body>
 </html>
 """
 
-# 6. Salva o HTML gerado
+# 7. Salva o HTML gerado
 with open("dashboard_consorcios.html", "w", encoding="utf-8") as f:
     f.write(html_template)
 
-print("Dashboard gerado via Python com sucesso!")
+print("Dashboard gerado com sucesso!")
